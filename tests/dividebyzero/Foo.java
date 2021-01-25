@@ -137,4 +137,28 @@ class Foo {
         b /= (3 * 0);
     }
 
+    public static void branchDivision(int i) {
+        int a = 1;
+        if (i % 2 == 0) {
+            a = -1;
+        } else {
+            a = 1;
+        }
+        // no error
+        int x = i / a;
+    }
+
+    public static void loopAccumulate() {
+        int x = 1;
+        for (int i = 0; i < 50; i++) {
+            if (i % 2 == 0) {
+                x = -1*x;
+            } else {
+                x = 1*x;
+            }
+        }
+        // no error
+        int y = 1 / x;
+    }
+
 }
