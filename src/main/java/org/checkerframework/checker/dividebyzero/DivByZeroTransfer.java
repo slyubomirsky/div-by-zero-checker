@@ -270,29 +270,6 @@ public class DivByZeroTransfer extends CFTransfer {
         };
 
         // the table for mod is the same as for division so we will also need it twice
-        // a / b | 0 | -  | +  | <=0 | !=0 | >=0 | Z | UD | top
-        //   0   | UD| 0  | 0  | top |  0  | top |top| UD | top
-        //   -   | UD| >=0| <=0| top |  Z  | top |top| UD | top
-        //   +   | UD| <=0| >=0| top |  Z  | top |top| UD | top
-        //  <=0  | UD| >=0| <=0| top |  Z  | top |top| UD | top
-        //  !=0  | UD| Z  | Z  | top |  Z  | top |top| UD | top
-        //  >=0  | UD| <=0| >=0| top |  Z  | top |top| UD | top
-        //   Z   | UD| Z  | Z  | top |  Z  | top |top| UD | top
-        //   UD  | UD|UD  | UD |  UD |  UD |  UD |UD | UD | UD
-        //  top  | UD| top| top| top | top | top |top| UD | top
-        // see part 1 of homework for explanation
-        AnnotationMirror[][] divisionTable = {
-            //                  0    |    -    |    +    |   <=0   |   !=0   |   >=0   |   Z    |   UD    |   top   
-            /*    0    */  {  udv    ,  zero   ,  zero   ,   top   ,  zero   ,   top   ,  top   ,  udv    ,   top   },
-            /*    -    */  {  udv    ,   gez   ,  lez    ,   top   ,  allZ   ,   top   ,  top   ,  udv    ,   top   },
-            /*    +    */  {  udv    ,   lez   ,  gez    ,   top   ,  allZ   ,   top   ,  top   ,  udv    ,   top   },
-            /*   <=0   */  {  udv    ,   gez   ,  lez    ,   top   ,  allZ   ,   top   ,  top   ,  udv    ,   top   },
-            /*   !=0   */  {  udv    ,  allZ   ,  allZ   ,   top   ,  allZ   ,   top   ,  top   ,  udv    ,   top   },
-            /*   >=0   */  {  udv    ,   lez   ,  gez    ,   top   ,  allZ   ,   top   ,  top   ,  udv    ,   top   },
-            /*    Z    */  {  udv    ,  allZ   ,  allZ   ,   top   ,  allZ   ,   top   ,  top   ,  udv    ,   top   },
-            /*    UD   */  {  udv    ,  udv    ,  udv    ,   udv   ,  udv    ,   udv   ,  udv   ,  udv    ,   udv   },
-            /*   top   */  {  udv    ,  top    ,  top    ,   top   ,  top    ,   top   ,  top   ,  udv    ,   top   }        
-        };
 
         switch (operator) {
         case PLUS:
@@ -326,9 +303,58 @@ public class DivByZeroTransfer extends CFTransfer {
             };
             return matchTable(multiplicationTable, lhs, rhs);
         case DIVIDE:
+            // a / b | 0 | -  | +  | <=0 | !=0 | >=0 | Z | UD | top
+            //   0   | UD| 0  | 0  | top |  0  | top |top| UD | top
+            //   -   | UD| >=0| <=0| top |  Z  | top |top| UD | top
+            //   +   | UD| <=0| >=0| top |  Z  | top |top| UD | top
+            //  <=0  | UD| >=0| <=0| top |  Z  | top |top| UD | top
+            //  !=0  | UD| Z  | Z  | top |  Z  | top |top| UD | top
+            //  >=0  | UD| <=0| >=0| top |  Z  | top |top| UD | top
+            //   Z   | UD| Z  | Z  | top |  Z  | top |top| UD | top
+            //   UD  | UD|UD  | UD |  UD |  UD |  UD |UD | UD | UD
+            //  top  | UD| top| top| top | top | top |top| UD | top
+            // see part 1 of homework for explanation
+            AnnotationMirror[][] divisionTable = {
+            //                  0    |    -    |    +    |   <=0   |   !=0   |   >=0   |   Z    |   UD    |   top   
+            /*    0    */  {  udv    ,  zero   ,  zero   ,   top   ,  zero   ,   top   ,  top   ,  udv    ,   top   },
+            /*    -    */  {  udv    ,   gez   ,  lez    ,   top   ,  allZ   ,   top   ,  top   ,  udv    ,   top   },
+            /*    +    */  {  udv    ,   lez   ,  gez    ,   top   ,  allZ   ,   top   ,  top   ,  udv    ,   top   },
+            /*   <=0   */  {  udv    ,   gez   ,  lez    ,   top   ,  allZ   ,   top   ,  top   ,  udv    ,   top   },
+            /*   !=0   */  {  udv    ,  allZ   ,  allZ   ,   top   ,  allZ   ,   top   ,  top   ,  udv    ,   top   },
+            /*   >=0   */  {  udv    ,   lez   ,  gez    ,   top   ,  allZ   ,   top   ,  top   ,  udv    ,   top   },
+            /*    Z    */  {  udv    ,  allZ   ,  allZ   ,   top   ,  allZ   ,   top   ,  top   ,  udv    ,   top   },
+            /*    UD   */  {  udv    ,  udv    ,  udv    ,   udv   ,  udv    ,   udv   ,  udv   ,  udv    ,   udv   },
+            /*   top   */  {  udv    ,  top    ,  top    ,   top   ,  top    ,   top   ,  top   ,  udv    ,   top   }        
+            };
             return matchTable(divisionTable, lhs, rhs);
         case MOD:
-            return matchTable(divisionTable, lhs, rhs);
+            // a % b | 0 | -  | +  | <=0 | !=0 | >=0 | Z | UD | top
+            //   0   | UD| 0  | 0  | top |  0  | top |top| UD | top
+            //   -   | UD| <=0| <=0| top | <=0 | top |top| UD | top
+            //   +   | UD| >=0| >=0| top | >=0 | top |top| UD | top
+            //  <=0  | UD| <=0| <=0| top | <=0 | top |top| UD | top
+            //  !=0  | UD| Z  | Z  | top |  Z  | top |top| UD | top
+            //  >=0  | UD| >=0| >=0| top | >=0 | top |top| UD | top
+            //   Z   | UD| Z  | Z  | top |  Z  | top |top| UD | top
+            //   UD  | UD| UD | UD |  UD |  UD |  UD |UD | UD | UD
+            //  top  | UD| top| top| top | top | top |top| UD | top
+            // Very similar to division table, but signs work differently with mod.
+            // Namely, in Java, the sign of the modulus is the sign of the left
+            // operand *regardless of the sign of the right operand*
+            // per http://www.cs.umd.edu/~clin/MoreJava/Intro/expr-mod.html
+            AnnotationMirror[][] modTable = {
+            //                  0    |    -    |    +    |   <=0   |   !=0   |   >=0   |   Z    |   UD    |   top   
+            /*    0    */  {  udv    ,  zero   ,  zero   ,   top   ,  zero   ,   top   ,  top   ,  udv    ,   top   },
+            /*    -    */  {  udv    ,   lez   ,  lez    ,   top   ,  lez    ,   top   ,  top   ,  udv    ,   top   },
+            /*    +    */  {  udv    ,   gez   ,  gez    ,   top   ,  gez    ,   top   ,  top   ,  udv    ,   top   },
+            /*   <=0   */  {  udv    ,   lez   ,  lez    ,   top   ,  lez    ,   top   ,  top   ,  udv    ,   top   },
+            /*   !=0   */  {  udv    ,  allZ   ,  allZ   ,   top   ,  allZ   ,   top   ,  top   ,  udv    ,   top   },
+            /*   >=0   */  {  udv    ,   gez   ,  gez    ,   top   ,  gez    ,   top   ,  top   ,  udv    ,   top   },
+            /*    Z    */  {  udv    ,  allZ   ,  allZ   ,   top   ,  allZ   ,   top   ,  top   ,  udv    ,   top   },
+            /*    UD   */  {  udv    ,  udv    ,  udv    ,   udv   ,  udv    ,   udv   ,  udv   ,  udv    ,   udv   },
+            /*   top   */  {  udv    ,  top    ,  top    ,   top   ,  top    ,   top   ,  top   ,  udv    ,   top   }        
+            };
+            return matchTable(modTable, lhs, rhs);
         default:
             return top();
         }
