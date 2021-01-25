@@ -116,7 +116,7 @@ public class DivByZeroTransfer extends CFTransfer {
             //  >=0   | + |>=0 |>=0 | >=0 | >=0 | >=0 |>=0|>=0 |>=0
             //   Z    |!=0| Z  | Z  |  Z  |  Z  |  Z  | Z | Z  | Z
             //   UD   |UD |UD  | UD |  UD |  UD |  UD | UD| UD | UD
-            //  top   |top|top |top | top | top | top |top| Z  | top
+            //  top   |!=0|top |top | top | top | top |top| Z  | top
             //
             // Reasoning: The only case that gives us more information is != 0,
             // since != being true or false for a *specific* value adds no information
@@ -135,7 +135,7 @@ public class DivByZeroTransfer extends CFTransfer {
             /*   >=0   */  {  pos    ,   gez   ,   gez   ,  gez    ,  gez    ,  gez    ,  gez   ,  gez    ,  gez    },
             /*    Z    */  { nonZero ,  allZ   ,  allZ   , allZ    ,  allZ   ,  allZ   ,  allZ  ,  allZ   ,  allZ   },
             /*    UD   */  {  udv    ,   udv   ,   udv   ,  udv    ,  udv    ,  udv    ,  udv   ,  udv    ,  udv    },
-            /*   top   */  {  top    ,   top   ,   top   ,  top    ,  top    ,  top    ,  top   ,  top    ,  top    }
+            /*   top   */  { nonZero ,   top   ,   top   ,  top    ,  top    ,  top    ,  top   ,  allZ   ,  top    }
             };
             return matchTable(neTable, lhs, rhs);
         case LT:
