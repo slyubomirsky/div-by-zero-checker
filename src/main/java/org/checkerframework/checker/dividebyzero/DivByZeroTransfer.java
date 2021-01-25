@@ -71,8 +71,144 @@ public class DivByZeroTransfer extends CFTransfer {
             Comparison operator,
             AnnotationMirror lhs,
             AnnotationMirror rhs) {
-        // TODO
-        return lhs;
+        AnnotationMirror zero = reflect(Zero.class);
+        AnnotationMirror top = reflect(Top.class);
+        AnnotationMirror udv = reflect(UndefinedValue.class);
+        AnnotationMirror neg = reflect(StrictlyNegative.class);
+        AnnotationMirror pos = reflect(StrictlyPositive.class);
+        AnnotationMirror gez = reflect(GreaterThanOrEqualToZero.class);
+        AnnotationMirror lez = reflect(LessThanOrEqualToZero.class);
+        AnnotationMirror nonZero = reflect(NonZero.class);
+        AnnotationMirror allZ = reflect(AllZ.class);
+
+        // to avoid any weirdness, bottom cannot possibly be refined, so eliminate it now
+        if (equal(lhs, bottom())) {
+            return bottom();
+        }
+        // should be impossible too
+        if (equal(rhs, bottom())) {
+            return lhs;
+        }
+
+        switch(operator) {
+        case EQ:
+            // * denotes impossible, never will be true
+            // a = b | 0 | -  | +  | <=0 | !=0 | >=0 | Z | UD | top
+            //   0   | 0 | 0* | 0* |  0  |  0* |  0  | 0 | 0* | 0
+            //   -   | 0*| -  | -* |  -  |  -  |  -* | - | -* | -
+            //   +   | 0*| +* | +  |  +* |  +  |  +  | + | +* | +
+            //  <=0  | 0 | -  |<=0*| <=0 |  -  |  0  |<=0|<=0*|<=0
+            //  !=0  | 0*| -  | +  |  -  | !=0 |  +  |!=0|!=0*|!=0
+            //  >=0  | 0 |>=0*| +  |  0  |  +  | >=0 |>=0|>=0*|>=0
+            //   Z   | 0 | -  | +  | <=0 | !=0 | >=0 | Z | Z* | Z
+            //   UD  | 0*| -* | +* | <=0*| !=0*| >=0*| Z*| UD | UD
+            //  top  | 0 | -  | +  | <=0 | !=0 | >=0 | Z | UD | top
+            // If we consider the impossible cases to be bot, then these are all the GLB
+            return glb(lhs, rhs);
+        case NE:
+            // (only impossible case is 0 != 0)
+            // a != b | 0 | -  | +  | <=0 | !=0 | >=0 | Z | UD | top
+            //   0    | 0*| 0  | 0  |  0  |  0  |  0  | 0 | 0  | 0
+            //   -    | - | -  | -  |  -  |  -  |  -  | - | -  | -
+            //   +    | + | +  | +  |  +  |  +  |  +  | + | +  | +
+            //  <=0   | - |<=0 |<=0 | <=0 | <=0 | <=0 |<=0|<=0 |<=0
+            //  !=0   |!=0|!=0 |!=0 | !=0 | !=0 | !=0 |!=0|!=0 |!=0
+            //  >=0   | + |>=0 |>=0 | >=0 | >=0 | >=0 |>=0|>=0 |>=0
+            //   Z    |!=0| Z  | Z  |  Z  |  Z  |  Z  | Z | Z  | Z
+            //   UD   |UD |UD  | UD |  UD |  UD |  UD | UD| UD | UD
+            //  top   |top|top |top | top | top | top |top| Z  | top
+            //
+            // Reasoning: The only case that gives us more information is != 0,
+            // since != being true or false for a *specific* value adds no information
+            // unless we know that specific value is zero.
+            // For example, let's consider <=0 != <=0: Suppose the LHS is 0 and the RHS is -4. 
+            // These are valid members of the equivalence classes yet the LHS is 0, so we cannot draw any conclusion
+            // from the RHS potentially being 0 (it may not be 0).
+            // We consider top to be potentially undefined so not being equal to a specific int does not disqualify that
+            AnnotationMirror[][] neTable = {
+            //                  0    |    -    |    +    |   <=0   |   !=0   |   >=0   |   Z    |   UD    |   top   
+            /*    0    */  { bottom(),   zero  ,   zero  ,  zero   ,  zero   ,  zero   ,  zero  ,  zero   ,  zero   },
+            /*    -    */  {  neg    ,   neg   ,   neg   ,  neg    ,  neg    ,  neg    ,  neg   ,  neg    ,  neg    },
+            /*    +    */  {  pos    ,   pos   ,   pos   ,  pos    ,  pos    ,  pos    ,  pos   ,  pos    ,  pos    },
+            /*   <=0   */  {  neg    ,   lez   ,   lez   ,  lez    ,  lez    ,  lez    ,  lez   ,  lez    ,  lez    },
+            /*   !=0   */  { nonZero , nonZero , nonZero , nonZero , nonZero , nonZero , nonZero, nonZero , nonZero },
+            /*   >=0   */  {  pos    ,   gez   ,   gez   ,  gez    ,  gez    ,  gez    ,  gez   ,  gez    ,  gez    },
+            /*    Z    */  { nonZero ,  allZ   ,  allZ   , allZ    ,  allZ   ,  allZ   ,  allZ  ,  allZ   ,  allZ   },
+            /*    UD   */  {  udv    ,   udv   ,   udv   ,  udv    ,  udv    ,  udv    ,  udv   ,  udv    ,  udv    },
+            /*   top   */  {  top    ,   top   ,   top   ,  top    ,  top    ,  top    ,  top   ,  top    ,  top    }
+            };
+            return matchTable(neTable, lhs, rhs);
+        case LT:
+            // * denotes impossible, never will be true
+            // a < b | 0  | -  | +  | <=0 | !=0 | >=0 | Z | UD | top
+            //   0   | 0* | 0* | 0  |  0* |  0  |  0  | 0 | 0* | 0
+            //   -   | -  | -  | -  |  -  |  -  |  -  | - | -* | -
+            //   +   | +* | +* | +  |  +* |  +  |  +  | + | +* | +
+            //  <=0  | -  | -  |<=0 |  -  | <=0 | <=0 |<=0|<=0*|<=0
+            //  !=0  | -  | -  |!=0 |  -  | !=0 | !=0 |!=0|!=0*|!=0
+            //  >=0  |>=0*|>=0*|>=0 | >=0*| >=0 | >=0 |>=0|>=0*|>=0
+            //   Z   | -  | -  | Z  |  -  |  Z  |  Z  | Z | Z* | Z
+            //   UD  |UD  |UD  |UD  |  UD | UD  | UD  |UD | UD | UD
+            //  top  | -  | -  | Z  |  -  |  Z  |  Z  | Z | UD | Z
+            // Notes: This is an exclusive bound, so if the RHS is <=0, the LHS
+            // cannot possibly be 0. Note that we can draw no new conclusions if the RHS
+            // is +, !=0, or >=0, since a value less than any *specific member* of those groups
+            // can still be positive, negative, or 0.
+
+            AnnotationMirror[][] ltTable = {
+            //                  0    |    -    |    +    |   <=0   |   !=0   |   >=0   |   Z    |   UD    |   top   
+            /*    0    */  { bottom(), bottom(),   zero  , bottom(),  zero   ,  zero   ,  zero  , bottom(),  zero   },
+            /*    -    */  {  neg    ,   neg   ,   neg   ,  neg    ,  neg    ,  neg    ,  neg   , bottom(),  neg    },
+            /*    +    */  { bottom(), bottom(),   pos   , bottom(),  pos    ,  pos    ,  pos   , bottom(),  pos    },
+            /*   <=0   */  {  neg    ,  neg    ,   lez   ,  neg    ,  lez    ,  lez    ,  lez   , bottom(),  lez    },
+            /*   !=0   */  {  neg    ,  neg    , nonZero ,  neg    , nonZero , nonZero , nonZero, bottom(), nonZero },
+            /*   >=0   */  { bottom(), bottom(),   gez   , bottom(),  gez    ,  gez    ,  gez   , bottom(),  gez    },
+            /*    Z    */  {  neg    ,  neg    ,  allZ   ,  neg    ,  allZ   ,  allZ   ,  allZ  , bottom(),  allZ   },
+            /*    UD   */  {  udv    ,  udv    ,  udv    ,  udv    ,  udv    ,  udv    ,  udv   ,  udv    ,   udv   },
+            /*   top   */  {  neg    ,  neg    ,  allZ   ,  neg    ,  allZ   ,  allZ   ,  allZ  ,  udv    ,  allZ   }
+            };
+            return matchTable(ltTable, lhs, rhs);
+        case LE:
+            // * denotes impossible, never will be true
+            // a <= b | 0 | -  | +  | <=0 | !=0 | >=0 | Z | UD | top
+            //   0    | 0 | 0  | 0  |  0  |  0  |  0  | 0 | 0* | 0
+            //   -    | - | -  | -  |  -  |  -  |  -  | - | -* | -
+            //   +    | +*| +* | +  |  +* |  +  |  +  | + | +* | +
+            //  <=0   |<=0| -  |<=0 | <=0 | <=0 | <=0 |<=0|<=0*|<=0
+            //  !=0   | - | -  |!=0 |  -  | !=0 | !=0 |!=0|!=0*|!=0
+            //  >=0   | 0 |>=0*|>=0 |  0  | >=0 | >=0 |>=0|>=0*|>=0
+            //   Z    |<=0| -  | Z  | <=0 |  Z  |  Z  | Z | Z* | Z
+            //   UD   |UD*|UD* | UD*|  UD*|  UD*|  UD*|UD*| UD*| UD*
+            //  top   |<=0| -  | Z  | <=0 |  Z  |  Z  | Z | Z* | Z
+            // Reasoning: The inclusive bound changes some things.
+            // Interesting cases: 
+            // * >=0 <= 0: The only way for this to be true is if the LHS *is* 0.
+            // * >=0 <= <=0: The only for this to be true is if the LHS and RHS are both 0.
+            // * !=0 <= <=0: The LHS is already nonzero so it must be negative (similarly !=0 <= 0)
+            // Otherwise, if the RHS is <=0 or 0, generally consider the result <=0 and if the RHS is -,
+            //   consider the result -. Can't draw any new conclusions for the other cases
+            AnnotationMirror[][] leTable = {
+            //                  0    |    -    |    +    |   <=0   |   !=0   |   >=0   |   Z    |   UD    |   top   
+            /*    0    */  {  zero   ,   zero  ,   zero  ,   zero  ,  zero   ,  zero   ,  zero  , bottom(),  zero   },
+            /*    -    */  {  neg    ,   neg   ,   neg   ,  neg    ,  neg    ,  neg    ,  neg   , bottom(),  neg    },
+            /*    +    */  { bottom(), bottom(),   pos   , bottom(),  pos    ,  pos    ,  pos   , bottom(),  pos    },
+            /*   <=0   */  {  lez    ,  neg    ,   lez   ,  lez    ,  lez    ,  lez    ,  lez   , bottom(),  lez    },
+            /*   !=0   */  {  neg    ,  neg    , nonZero ,  neg    , nonZero , nonZero , nonZero, bottom(), nonZero },
+            /*   >=0   */  {  zero   , bottom(),   gez   ,  zero   ,  gez    ,  gez    ,  gez   , bottom(),  gez    },
+            /*    Z    */  {  lez    ,  neg    ,  allZ   ,  lez    ,  allZ   ,  allZ   ,  allZ  , bottom(),  allZ   },
+            /*    UD   */  {  udv    ,  udv    ,  udv    ,  udv    ,  udv    ,  udv    ,  udv   ,  udv    ,   udv   },
+            /*   top   */  {  lez    ,  neg    ,  allZ   ,  lez    ,  allZ   ,  allZ   ,  allZ  ,  udv    ,  allZ   }
+            };
+            return matchTable(leTable, lhs, rhs);
+        case GT:
+            // a > b --> b < a
+            return refineLhsOfComparison(Comparison.LT, rhs, lhs);
+        case GE:
+            // a >= b -> b <= a
+            return refineLhsOfComparison(Comparison.LE, rhs, lhs);
+        default:
+            return lhs;
+        }
     }
 
     /**
@@ -93,8 +229,181 @@ public class DivByZeroTransfer extends CFTransfer {
             BinaryOperator operator,
             AnnotationMirror lhs,
             AnnotationMirror rhs) {
-        // TODO
-        return top();
+        AnnotationMirror zero = reflect(Zero.class);
+        AnnotationMirror top = reflect(Top.class);
+        AnnotationMirror udv = reflect(UndefinedValue.class);
+        AnnotationMirror neg = reflect(StrictlyNegative.class);
+        AnnotationMirror pos = reflect(StrictlyPositive.class);
+        AnnotationMirror gez = reflect(GreaterThanOrEqualToZero.class);
+        AnnotationMirror lez = reflect(LessThanOrEqualToZero.class);
+        AnnotationMirror nonZero = reflect(NonZero.class);
+        AnnotationMirror allZ = reflect(AllZ.class);
+
+        // eliminate bottom right away
+        if (equal(lhs, bottom()) || equal(rhs, bottom())) {
+            return bottom();
+        }
+
+        // We will need the table for addition twice
+        // a + b | 0 | -  | +  | <=0 | !=0 | >=0 | Z | UD | top
+        //   0   | 0 | -  | +  | <=0 | !=0 | >=0 | Z | UD | top
+        //   -   | - | -  | Z  |  -  |  Z  |  Z  | Z | UD | top
+        //   +   | + | Z  | +  |  Z  |  Z  |  +  | Z | UD | top
+        //  <=0  |<=0| -  | Z  | <=0 |  Z  |  Z  | Z | UD | top
+        //  !=0  |!=0| Z  | Z  |  Z  |  Z  |  Z  | Z | UD | top
+        //  >=0  |>=0| Z  | +  |  Z  |  Z  | >=0 | Z | UD | top
+        //   Z   | Z | Z  | Z  |  Z  |  Z  |  Z  | Z | UD | top
+        //   UD  |UD |UD  | UD |  UD |  UD |  UD |UD | UD | UD
+        //  top  |top| top| top| top | top | top |top| UD | top
+        // see part 1 of homework for explanation
+        AnnotationMirror[][] additionTable = {
+            //                  0    |    -    |    +    |   <=0   |   !=0   |   >=0   |   Z    |   UD    |   top   
+            /*    0    */  {  zero   ,   neg   ,   pos   ,   lez   , nonZero ,   gez   ,  allZ  ,  udv    ,   top   },
+            /*    -    */  {  neg    ,   neg   ,  allZ   ,   neg   ,  allZ   ,  allZ   ,  allZ  ,  udv    ,   top   },
+            /*    +    */  {  pos    ,  allZ   ,   pos   ,  allZ   ,  allZ   ,  pos    ,  allZ  ,  udv    ,   top   },
+            /*   <=0   */  {  lez    ,  neg    ,  allZ   ,  lez    ,  allZ   ,  allZ   ,  allZ  ,  udv    ,   top   },
+            /*   !=0   */  {  nonZero,  allZ   ,  allZ   ,  allZ   ,  allZ   ,  allZ   ,  allZ  ,  udv    ,   top   },
+            /*   >=0   */  {  gez    ,  allZ   ,  pos    ,  allZ   ,  allZ   ,  gez    ,  allZ  ,  udv    ,   top   },
+            /*    Z    */  {  allZ   ,  allZ   ,  allZ   ,  allZ   ,  allZ   ,  allZ   ,  allZ  ,  udv    ,   top   },
+            /*    UD   */  {  udv    ,  udv    ,  udv    ,  udv    ,  udv    ,  udv    ,  udv   ,  udv    ,   udv   },
+            /*   top   */  {  top    ,  top    ,  top    ,  top    ,  top    ,  top    ,  top   ,  udv    ,   top   }        
+        };
+
+        // the table for mod is the same as for division so we will also need it twice
+        // a / b | 0 | -  | +  | <=0 | !=0 | >=0 | Z | UD | top
+        //   0   | UD| 0  | 0  | top |  0  | top |top| UD | top
+        //   -   | UD| >=0| <=0| top |  Z  | top |top| UD | top
+        //   +   | UD| <=0| >=0| top |  Z  | top |top| UD | top
+        //  <=0  | UD| >=0| <=0| top |  Z  | top |top| UD | top
+        //  !=0  | UD| Z  | Z  | top |  Z  | top |top| UD | top
+        //  >=0  | UD| <=0| >=0| top |  Z  | top |top| UD | top
+        //   Z   | UD| Z  | Z  | top |  Z  | top |top| UD | top
+        //   UD  | UD|UD  | UD |  UD |  UD |  UD |UD | UD | UD
+        //  top  | UD| top| top| top | top | top |top| UD | top
+        // see part 1 of homework for explanation
+        AnnotationMirror[][] divisionTable = {
+            //                  0    |    -    |    +    |   <=0   |   !=0   |   >=0   |   Z    |   UD    |   top   
+            /*    0    */  {  udv    ,  zero   ,  zero   ,   top   ,  zero   ,   top   ,  top   ,  udv    ,   top   },
+            /*    -    */  {  udv    ,   gez   ,  lez    ,   top   ,  allZ   ,   top   ,  top   ,  udv    ,   top   },
+            /*    +    */  {  udv    ,   lez   ,  gez    ,   top   ,  allZ   ,   top   ,  top   ,  udv    ,   top   },
+            /*   <=0   */  {  udv    ,   gez   ,  lez    ,   top   ,  allZ   ,   top   ,  top   ,  udv    ,   top   },
+            /*   !=0   */  {  udv    ,  allZ   ,  allZ   ,   top   ,  allZ   ,   top   ,  top   ,  udv    ,   top   },
+            /*   >=0   */  {  udv    ,   lez   ,  gez    ,   top   ,  allZ   ,   top   ,  top   ,  udv    ,   top   },
+            /*    Z    */  {  udv    ,  allZ   ,  allZ   ,   top   ,  allZ   ,   top   ,  top   ,  udv    ,   top   },
+            /*    UD   */  {  udv    ,  udv    ,  udv    ,   udv   ,  udv    ,   udv   ,  udv   ,  udv    ,   udv   },
+            /*   top   */  {  udv    ,  top    ,  top    ,   top   ,  top    ,   top   ,  top   ,  udv    ,   top   }        
+        };
+
+        switch (operator) {
+        case PLUS:
+            return matchTable(additionTable, lhs, rhs);
+        case MINUS:
+            // equivalent to just flipping sign on the second argument and treating as addition
+            return matchTable(additionTable, lhs, flipAnnotationSign(rhs));
+        case TIMES:
+            // a * b | 0 | -  | +  | <=0 | !=0 | >=0 | Z | UD | top
+            //   0   | 0 | 0  | 0  |  0  |  0  |  0  | 0 | UD | top
+            //   -   | 0 | +  | -  | >=0 | !=0 | <=0 | Z | UD | top
+            //   +   | 0 | -  | +  | <=0 | !=0 | >=0 | Z | UD | top
+            //  <=0  | 0 | >=0| <=0| >=0 | !=0 | <=0 | Z | UD | top
+            //  !=0  | 0 | !=0| !=0| !=0 | !=0 | !=0 | Z | UD | top
+            //  >=0  | 0 | <=0| >=0| <=0 | !=0 | >=0 | Z | UD | top
+            //   Z   | 0 | Z  | Z  |  Z  |  Z  |  Z  | Z | UD | top
+            //   UD  | UD|UD  | UD |  UD |  UD |  UD |UD | UD | UD
+            //  top  |top| top| top| top | top | top |top| UD | top
+            // see part 1 of homework for explanation
+            AnnotationMirror[][] multiplicationTable = {
+                //                  0    |    -    |    +    |   <=0   |   !=0   |   >=0   |   Z    |   UD    |   top   
+                /*    0    */  {  zero   ,   zero  ,   zero  ,   zero  ,   zero  ,  zero   ,  zero  ,  udv    ,   top   },
+                /*    -    */  {  zero   ,  pos    ,   neg   ,   gez   , nonZero ,  lez    ,  allZ  ,  udv    ,   top   },
+                /*    +    */  {  zero   ,  neg    ,   pos   ,   lez   , nonZero ,  gez    ,  allZ  ,  udv    ,   top   },
+                /*   <=0   */  {  zero   ,  gez    ,   lez   ,   gez   , nonZero ,  lez    ,  allZ  ,  udv    ,   top   },
+                /*   !=0   */  {  zero   , nonZero , nonZero , nonZero , nonZero ,  nonZero,  allZ  ,  udv    ,   top   },
+                /*   >=0   */  {  zero   ,  allZ   ,  pos    ,  allZ   , nonZero ,  gez    ,  allZ  ,  udv    ,   top   },
+                /*    Z    */  {  zero   ,  allZ   ,  allZ   ,  allZ   ,  allZ   ,  allZ   ,  allZ  ,  udv    ,   top   },
+                /*    UD   */  {  udv    ,  udv    ,  udv    ,  udv    ,  udv    ,  udv    ,  udv   ,  udv    ,   udv   },
+                /*   top   */  {  top    ,  top    ,  top    ,  top    ,  top    ,  top    ,  top   ,  udv    ,   top   }        
+            };
+            return matchTable(multiplicationTable, lhs, rhs);
+        case DIVIDE:
+            return matchTable(divisionTable, lhs, rhs);
+        case MOD:
+            return matchTable(divisionTable, lhs, rhs);
+        default:
+            return top();
+        }
+    }
+
+    // Flipped counterparts:
+    // - : +
+    // + : -
+    // <=0 : >=0
+    // >=0 : <=0
+    // for all others, keep the same
+    private AnnotationMirror flipAnnotationSign(AnnotationMirror val) {
+        AnnotationMirror neg = reflect(StrictlyNegative.class);
+        AnnotationMirror pos = reflect(StrictlyPositive.class);
+        AnnotationMirror gez = reflect(GreaterThanOrEqualToZero.class);
+        AnnotationMirror lez = reflect(LessThanOrEqualToZero.class);
+        if (equal(val, neg)) {
+            return pos;
+        }
+        if (equal(val, pos)) {
+            return neg;
+        }
+        if (equal(val, lez)) {
+            return gez;
+        }
+        if (equal(val, gez)) {
+            return lez;
+        }
+        return val;
+    }
+
+    // A really dumb but simple way of getting around having to override hashcodes.
+    // Just assigns an index value to each abstract value to index into an array of
+    // abstract values
+    private int tableIndex(AnnotationMirror val) {
+        // -1 for bottom: we assume we will eliminate bottoms
+        if (equal(val, bottom())) {
+            return -1;
+        }
+        if (equal(val, reflect(Zero.class))) {
+            return 0;
+        }
+        if (equal(val, reflect(StrictlyNegative.class))) {
+            return 1;
+        }
+        if (equal(val, reflect(StrictlyPositive.class))) {
+            return 2;
+        }
+        if (equal(val, reflect(LessThanOrEqualToZero.class))) {
+            return 3;
+        }
+        if (equal(val, reflect(NonZero.class))) {
+            return 4;
+        }
+        if (equal(val, reflect(GreaterThanOrEqualToZero.class))) {
+            return 5;
+        }
+        if (equal(val, reflect(AllZ.class))) {
+            return 6;
+        }
+        if (equal(val, reflect(UndefinedValue.class))) {
+            return 7;
+        }
+        // only top remains
+        return 8;
+    }
+
+    private AnnotationMirror matchTable(AnnotationMirror[][] lookupTable, AnnotationMirror lhs, AnnotationMirror rhs) {
+        assert lookupTable.length == 9;
+        assert lookupTable[0].length == 9;
+        int lhsIdx = tableIndex(lhs);
+        int rhsIdx = tableIndex(rhs);
+        // eliminate bottoms first
+        assert lhsIdx != -1 && rhsIdx != -1;
+        return lookupTable[lhsIdx][rhsIdx];
     }
 
     // ========================================================================

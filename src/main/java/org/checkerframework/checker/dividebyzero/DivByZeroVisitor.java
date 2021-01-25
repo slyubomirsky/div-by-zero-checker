@@ -30,8 +30,28 @@ public class DivByZeroVisitor extends BaseTypeVisitor<DivByZeroAnnotatedTypeFact
      */
     private boolean errorAt(BinaryTree node) {
         // A BinaryTree represents a binary operator, like + or -.
-        // TODO
-        return false;
+
+        // no error if we're not considering a division
+        Tree.Kind operator = node.getKind();
+        if (!DIVISION_OPERATORS.contains(operator)) {
+            return false;
+        }
+
+        // we are only considering integers so only consider if both operands are ints
+        // (after all, if at least one operand is a float, the expression is promoted to one on floats)
+        ExpressionTree divisor = node.getRightOperand();
+        if (!isInt(node.getLeftOperand()) || !isInt(divisor)) {
+            return false;
+        }
+
+        // We only get a divide by zero error if the right operand (divisor) is zero or potentially zero.
+        // All relevant annotations: Zero, GreaterThanOrEqualToZero, LessThanOrEqualToZero, AllZ, Top
+        // Note: Division by an undefined value is a different sort of error, so that's why we don't catch that case here
+        return (hasAnnotation(divisor, Top.class) 
+            || hasAnnotation(divisor, AllZ.class) 
+            || hasAnnotation(divisor, GreaterThanOrEqualToZero.class)
+            || hasAnnotation(divisor, LessThanOrEqualToZero.class)
+            || hasAnnotation(divisor, Zero.class));
     }
 
     /**
@@ -41,10 +61,27 @@ public class DivByZeroVisitor extends BaseTypeVisitor<DivByZeroAnnotatedTypeFact
      * @return true if an error should be reported, false otherwise
      */
     private boolean errorAt(CompoundAssignmentTree node) {
-        // A CompoundAssignmentTree represents a binary operator plus assignment,
-        // like "x += 10".
-        // TODO
-        return false;
+        // no error if we're not considering a division
+        Tree.Kind operator = node.getKind();
+        if (!DIVISION_OPERATORS.contains(operator)) {
+            return false;
+        }
+
+        // we are only considering integers so only consider if both operands are ints
+        // (after all, if at least one operand is a float, the expression is promoted to one on floats)
+        ExpressionTree divisor = node.getExpression();
+        if (!isInt(node.getVariable()) || !isInt(divisor)) {
+            return false;
+        }
+
+        // We only get a divide by zero error if the divisor is zero or potentially zero.
+        // All relevant annotations: Zero, GreaterThanOrEqualToZero, LessThanOrEqualToZero, AllZ, Top
+        // Note: Division by an undefined value is a different sort of error, so that's why we don't catch that case here
+        return (hasAnnotation(divisor, Top.class) 
+            || hasAnnotation(divisor, AllZ.class) 
+            || hasAnnotation(divisor, GreaterThanOrEqualToZero.class)
+            || hasAnnotation(divisor, LessThanOrEqualToZero.class)
+            || hasAnnotation(divisor, Zero.class));
     }
 
     // ========================================================================
