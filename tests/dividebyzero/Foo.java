@@ -184,5 +184,39 @@ class Foo {
         int z = 1 / y;
     }
 
+    public static void modSigns(int x) {
+        int divisor = 1;
+        if (x < 0) {
+            // x % 3 is non-positive
+            divisor -= x % 3;
+        } else {
+            // x % -3 is non-negative
+            divisor += x % -3;
+        }
+        // no error
+        int y = 1 / divisor;
+    }
+
+    public static void cautiousCheck(int x) {
+        int bound = x;
+        if (bound < 0) {
+            bound = -1*bound;
+        }
+
+        int divisor = bound + 1;
+        for (int i = 0; i < bound; i++) {
+            divisor--;
+        }
+        // in reality, the result will always be 1,
+        // but without unrolling the loop or some kind of interval analysis,
+        // this analysis will not be able to conclude that the divisor is nonzero
+        if (divisor <= 0) {
+            assert false;
+        } else {
+            // no error
+            int z = 1 / divisor;
+        }
+    }
+
 
 }
