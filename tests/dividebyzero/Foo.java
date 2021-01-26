@@ -161,4 +161,28 @@ class Foo {
         int y = 1 / x;
     }
 
+    public static void divideByMod() {
+        int x = 4 % 2;
+        // :: error: divide.by.zero
+        int y = 3 / x;
+    }
+
+    public static void truncatingDivision() {
+        int x = 3 / 4;
+        // :: error: divide.by.zero
+        int y = 3 / x;
+    }
+
+    public static void branchBySign(int x) {
+        int y = 5;
+        if (x < 0) {
+            y -= x;
+        } else {
+            y += x;
+        }
+        // no error
+        int z = 1 / y;
+    }
+
+
 }
