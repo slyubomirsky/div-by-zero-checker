@@ -201,11 +201,63 @@ public class DivByZeroTransfer extends CFTransfer {
             };
             return matchTable(leTable, lhs, rhs);
         case GT:
-            // a > b --> b < a
-            return refineLhsOfComparison(Comparison.LT, rhs, lhs);
+            // * denotes impossible, never will be true
+            // a > b | 0  | -  | +  | <=0 | !=0 | >=0 | Z | UD | top
+            //   0   | 0* | 0  | 0* |  0  |  0  |  0* | 0 | 0* | 0
+            //   -   | -* | -  | -* |  -  |  -  |  -* | - | -* | -
+            //   +   | +  | +  | +  |  +  |  +  |  +  | + | +* | +
+            //  <=0  |<=0*|<=0 |<=0*| <=0 | <=0 | <=0*|<=0|<=0*|<=0
+            //  !=0  | +  |!=0 | +  | !=0 | !=0 |  +  |!=0|!=0*|!=0
+            //  >=0  | +  |>=0 | +  | >=0 | >=0 |  +  |>=0|>=0*|>=0
+            //   Z   | +  | Z  | +  |  Z  |  Z  |  +  | Z | Z* | Z
+            //   UD  |UD  |UD  |UD  |  UD | UD  | UD  |UD | UD | UD
+            //  top  | +  | Z  | +  |  Z  |  Z  |  +  | Z | UD | Z
+            // Notes: Similar to the LT table, but flipped between positives and negatives.
+            // If the RHS is >=0, the LHS must be strictly greater than 0, since it's an exclusive bound
+            // (hence >=0 > >=0 results in a strictly positive value, since 0 is not greater than 0).
+            AnnotationMirror[][] gtTable = {
+            //                  0    |    -    |    +    |   <=0   |   !=0   |   >=0   |   Z    |   UD    |   top   
+            /*    0    */  { bottom(),   zero  , bottom(),  zero   ,   zero  , bottom(),  zero  , bottom(),  zero   },
+            /*    -    */  { bottom(),   neg   , bottom(),  neg    ,   neg   , bottom(),  neg   , bottom(),  neg    },
+            /*    +    */  {   pos   ,   pos   ,   pos   ,  pos    ,   pos   ,  pos    ,  pos   , bottom(),  pos    },
+            /*   <=0   */  { bottom(),   lez   , bottom(),  lez    ,   lez   , bottom(),  lez   , bottom(),  lez    },
+            /*   !=0   */  {   pos   , nonZero ,   pos   , nonZero , nonZero ,  pos    , nonZero, bottom(), nonZero },
+            /*   >=0   */  {   pos   ,   gez   ,   pos   ,  gez    ,   gez   ,  pos    ,  gez   , bottom(),  gez    },
+            /*    Z    */  {   pos   ,   pos   ,   pos   ,  allZ   ,  allZ   ,  pos    ,  allZ  , bottom(),  allZ   },
+            /*    UD   */  {   udv   ,   udv   ,   udv   ,  udv    ,  udv    ,  udv    ,  udv   ,  udv    ,   udv   },
+            /*   top   */  {   pos   ,   pos   ,   pos   ,  allZ   ,  allZ   ,  pos    ,  allZ  ,  udv    ,  allZ   }
+            };
+            return matchTable(gtTable, lhs, rhs);
         case GE:
-            // a >= b -> b <= a
-            return refineLhsOfComparison(Comparison.LE, rhs, lhs);
+            // * denotes impossible, never will be true
+            // a >= b | 0 | -  | +  | <=0 | !=0 | >=0 | Z | UD | top
+            //   0    | 0 | 0  | 0* |  0  |  0  |  0  | 0 | 0* | 0
+            //   -    | -*| -  | -* |  -  |  -  |  -* | - | -* | -
+            //   +    | + | +  | +  |  +  |  +  |  +  | + | +* | +
+            //  <=0   | 0 |<=0 |<=0*| <=0 | <=0 |  0  |<=0|<=0*|<=0
+            //  !=0   | + |!=0 | +  | !=0 | !=0 |  +  |!=0|!=0*|!=0
+            //  >=0   |>=0|>=0 | +  | >=0 | >=0 | >=0 |>=0|>=0*|>=0
+            //   Z    |>=0| Z  | +  |  Z  |  Z  | >=0 | Z | Z* | Z
+            //   UD   |UD*|UD* | UD*|  UD*|  UD*|  UD*|UD*| UD*| UD*
+            //  top   |>=0| Z  | +  |  Z  |  Z  | >=0 | Z | Z* | Z
+            // Notes: Similar to the LE table, but flipped between positives and negatives.
+            // * <=0 >= 0 can only be true if the LHS is 0 (similarly <=0 >= >=0, though not >=0 >= <=0, which is a tautology)
+            // * Being >= - gives no extra information, but being >= + means the number must be +
+            // * Generally, being >= + implies the number is +, being >= >=0 means the number is >=0 (so if it already can't be 0 it must be +)
+            //   Can't draw any new conclusions from being >= - or >= <=0.
+            AnnotationMirror[][] geTable = {
+            //                  0    |    -    |    +    |   <=0   |   !=0   |   >=0   |   Z    |   UD    |   top   
+            /*    0    */  {   zero  ,   zero  , bottom(),  zero   ,   zero  ,  zero   ,  zero  , bottom(),  zero   },
+            /*    -    */  { bottom(),   neg   , bottom(),  neg    ,   neg   , bottom(),  neg   , bottom(),  neg    },
+            /*    +    */  {   pos   ,   pos   ,   pos   ,  pos    ,   pos   ,  pos    ,  pos   , bottom(),  pos    },
+            /*   <=0   */  {   zero  ,   lez   , bottom(),  lez    ,   lez   ,  zero   ,  lez   , bottom(),  lez    },
+            /*   !=0   */  {   pos   , nonZero ,   pos   , nonZero , nonZero ,  pos    , nonZero, bottom(), nonZero },
+            /*   >=0   */  {   gez   ,   gez   ,   pos   ,  gez    ,   gez   ,  gez    ,  gez   , bottom(),  gez    },
+            /*    Z    */  {   gez   ,  allZ   ,   pos   ,  allZ   ,  allZ   ,  gez    ,  allZ  , bottom(),  allZ   },
+            /*    UD   */  {   udv   ,   udv   ,   udv   ,  udv    ,  udv    ,  udv    ,  udv   ,  udv    ,   udv   },
+            /*   top   */  {   gez   ,  allZ   ,   pos   ,  allZ   ,  allZ   ,  gez    ,  allZ  ,  udv    ,  allZ   }
+            };
+            return matchTable(geTable, lhs, rhs);
         default:
             return lhs;
         }
