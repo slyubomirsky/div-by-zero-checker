@@ -269,8 +269,6 @@ public class DivByZeroTransfer extends CFTransfer {
             /*   top   */  {  top    ,  top    ,  top    ,  top    ,  top    ,  top    ,  top   ,  udv    ,   top   }        
         };
 
-        // the table for mod is the same as for division so we will also need it twice
-
         switch (operator) {
         case PLUS:
             return matchTable(additionTable, lhs, rhs);
