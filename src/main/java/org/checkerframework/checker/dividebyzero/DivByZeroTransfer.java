@@ -223,9 +223,9 @@ public class DivByZeroTransfer extends CFTransfer {
             /*   <=0   */  { bottom(),   lez   , bottom(),  lez    ,   lez   , bottom(),  lez   , bottom(),  lez    },
             /*   !=0   */  {   pos   , nonZero ,   pos   , nonZero , nonZero ,  pos    , nonZero, bottom(), nonZero },
             /*   >=0   */  {   pos   ,   gez   ,   pos   ,  gez    ,   gez   ,  pos    ,  gez   , bottom(),  gez    },
-            /*    Z    */  {   pos   ,   pos   ,   pos   ,  allZ   ,  allZ   ,  pos    ,  allZ  , bottom(),  allZ   },
+            /*    Z    */  {   pos   ,   allZ  ,   pos   ,  allZ   ,  allZ   ,  pos    ,  allZ  , bottom(),  allZ   },
             /*    UD   */  {   udv   ,   udv   ,   udv   ,  udv    ,  udv    ,  udv    ,  udv   ,  udv    ,   udv   },
-            /*   top   */  {   pos   ,   pos   ,   pos   ,  allZ   ,  allZ   ,  pos    ,  allZ  ,  udv    ,  allZ   }
+            /*   top   */  {   pos   ,   allZ  ,   pos   ,  allZ   ,  allZ   ,  pos    ,  allZ  ,  udv    ,  allZ   }
             };
             return matchTable(gtTable, lhs, rhs);
         case GE:
