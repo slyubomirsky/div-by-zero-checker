@@ -179,7 +179,7 @@ public class DivByZeroTransfer extends CFTransfer {
             //  >=0   | 0 |>=0*|>=0 |  0  | >=0 | >=0 |>=0|>=0*|>=0
             //   Z    |<=0| -  | Z  | <=0 |  Z  |  Z  | Z | Z* | Z
             //   UD   |UD*|UD* | UD*|  UD*|  UD*|  UD*|UD*| UD*| UD*
-            //  top   |<=0| -  | Z  | <=0 |  Z  |  Z  | Z | Z* | Z
+            //  top   |<=0| -  | Z  | <=0 |  Z  |  Z  | Z | UD*| Z
             // Reasoning: The inclusive bound changes some things.
             // Interesting cases: 
             // * >=0 <= 0: The only way for this to be true is if the LHS *is* 0.
@@ -239,7 +239,7 @@ public class DivByZeroTransfer extends CFTransfer {
             //  >=0   |>=0|>=0 | +  | >=0 | >=0 | >=0 |>=0|>=0*|>=0
             //   Z    |>=0| Z  | +  |  Z  |  Z  | >=0 | Z | Z* | Z
             //   UD   |UD*|UD* | UD*|  UD*|  UD*|  UD*|UD*| UD*| UD*
-            //  top   |>=0| Z  | +  |  Z  |  Z  | >=0 | Z | Z* | Z
+            //  top   |>=0| Z  | +  |  Z  |  Z  | >=0 | Z | UD*| Z
             // Notes: Similar to the LE table, but flipped between positives and negatives.
             // * <=0 >= 0 can only be true if the LHS is 0 (similarly <=0 >= >=0, though not >=0 >= <=0, which is a tautology)
             // * Being >= - gives no extra information, but being >= + means the number must be +
@@ -332,9 +332,9 @@ public class DivByZeroTransfer extends CFTransfer {
             //   0   | 0 | 0  | 0  |  0  |  0  |  0  | 0 | UD | top
             //   -   | 0 | +  | -  | >=0 | !=0 | <=0 | Z | UD | top
             //   +   | 0 | -  | +  | <=0 | !=0 | >=0 | Z | UD | top
-            //  <=0  | 0 | >=0| <=0| >=0 | !=0 | <=0 | Z | UD | top
-            //  !=0  | 0 | !=0| !=0| !=0 | !=0 | !=0 | Z | UD | top
-            //  >=0  | 0 | <=0| >=0| <=0 | !=0 | >=0 | Z | UD | top
+            //  <=0  | 0 | >=0| <=0| >=0 |  Z  | <=0 | Z | UD | top
+            //  !=0  | 0 | !=0| !=0|  Z  | !=0 |  Z  | Z | UD | top
+            //  >=0  | 0 | <=0| >=0| <=0 |  Z  | >=0 | Z | UD | top
             //   Z   | 0 | Z  | Z  |  Z  |  Z  |  Z  | Z | UD | top
             //   UD  | UD|UD  | UD |  UD |  UD |  UD |UD | UD | UD
             //  top  |top| top| top| top | top | top |top| UD | top
@@ -344,9 +344,9 @@ public class DivByZeroTransfer extends CFTransfer {
                 /*    0    */  {  zero   ,   zero  ,   zero  ,   zero  ,   zero  ,  zero   ,  zero  ,  udv    ,   top   },
                 /*    -    */  {  zero   ,  pos    ,   neg   ,   gez   , nonZero ,  lez    ,  allZ  ,  udv    ,   top   },
                 /*    +    */  {  zero   ,  neg    ,   pos   ,   lez   , nonZero ,  gez    ,  allZ  ,  udv    ,   top   },
-                /*   <=0   */  {  zero   ,  gez    ,   lez   ,   gez   , nonZero ,  lez    ,  allZ  ,  udv    ,   top   },
-                /*   !=0   */  {  zero   , nonZero , nonZero , nonZero , nonZero ,  nonZero,  allZ  ,  udv    ,   top   },
-                /*   >=0   */  {  zero   ,  allZ   ,  pos    ,  allZ   , nonZero ,  gez    ,  allZ  ,  udv    ,   top   },
+                /*   <=0   */  {  zero   ,  gez    ,   lez   ,   gez   ,  allZ   ,  lez    ,  allZ  ,  udv    ,   top   },
+                /*   !=0   */  {  zero   , nonZero , nonZero ,  allZ   , nonZero ,  allZ   ,  allZ  ,  udv    ,   top   },
+                /*   >=0   */  {  zero   ,  lez    ,   gez   ,   lez   ,  allZ   ,  gez    ,  allZ  ,  udv    ,   top   },
                 /*    Z    */  {  zero   ,  allZ   ,  allZ   ,  allZ   ,  allZ   ,  allZ   ,  allZ  ,  udv    ,   top   },
                 /*    UD   */  {  udv    ,  udv    ,  udv    ,  udv    ,  udv    ,  udv    ,  udv   ,  udv    ,   udv   },
                 /*   top   */  {  top    ,  top    ,  top    ,  top    ,  top    ,  top    ,  top   ,  udv    ,   top   }        
